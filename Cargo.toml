@@ -10,7 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 plygui-api = {version = "0.0.1", path = "../plygui-api"}
 lazy_static = "~0.2"
-image = "*"
+image = {version = "~0.19", optional = true}
 
 plygui-gtk = {version = "0.0.1", path = "../plygui-gtk", optional = true}
 gtk = { version = "^0.4", features = ["v3_18"], optional = true }
@@ -39,7 +39,7 @@ core-foundation = {version = "~0.3", optional = true}
 objc = {version = "~0.2", optional = true}
 
 [features]
-win32 = ["winapi","plygui-win32"]
+win32 = ["winapi","plygui-win32","image"]
 gtk3 = ["plygui-gtk","gtk","gdk","glib","pango","plygui-gtk"]
 qt5 = ["plygui-qt","qt_core","qt_gui","qt_widgets","qt_core_custom_events","plygui-qt"]
 cocoa_ = ["cocoa","core-foundation","objc","plygui-cocoa"]
