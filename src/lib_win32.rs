@@ -36,7 +36,7 @@ pub struct ImageWin32 {
 
 impl ImageWin32 {
 	fn install_image(&mut self, content: super::image::DynamicImage) {
-		use image::{Pixel, GenericImage};
+		use image::GenericImage;
 		
 		let (w, h) = content.dimensions();
 
@@ -71,13 +71,8 @@ impl ImageWin32 {
 		        panic!("Could not load image.")
 		    }
 
-            let cb_stride = w as u32 * 4;
+            ptr::copy(content.flipv().to_rgba().into_raw().as_ptr(), pv_image_bits as *mut u8, (w * h * 4) as usize);
 
-            for (x, y, p) in content.pixels() {
-                let mut p = p.to_rgba();
-                p.data = [p.data[2], p.data[1], p.data[0], p.data[3]];
-                *(pv_image_bits.offset(((x * 4) + ((h - y - 1) * cb_stride)) as isize) as *mut [u8; 4]) = p.data;
-            }
         }
 	}
 	fn remove_image(&mut self) {
@@ -298,12 +293,13 @@ unsafe extern "system" fn handler(hwnd: windef::HWND, msg: minwindef::UINT, wpar
 	        let mut ps: winuser::PAINTSTRUCT = mem::zeroed();
 	
 	        let mut hdc = winuser::BeginPaint(hwnd, &mut ps); //HDC
-	
+	common::log_error();
 	        let mut hdc_mem = wingdi::CreateCompatibleDC(hdc); //HDC
+	common::log_error();
 	        let hbm_old = wingdi::SelectObject(hdc_mem, sc.bmp as *mut c_void); //HBITMAP
-	
+	common::log_error();
 	        wingdi::GetObjectW(sc.bmp as *mut c_void, mem::size_of::<wingdi::BITMAP>() as i32, &mut bm as *mut _ as *mut c_void);
-	
+	common::log_error();
 	        //wingdi::BitBlt(hdc, 0, 0, bm.bmWidth, bm.bmHeight, hdc_mem, 0, 0, wingdi::SRCCOPY);
 	
 	        //wingdi::SelectObject(hdc_mem, hbm_old);
@@ -326,10 +322,11 @@ unsafe extern "system" fn handler(hwnd: windef::HWND, msg: minwindef::UINT, wpar
 		                         500,
 		                         500,
 								blendfunc);
-	        
+	common::log_error();       
 	        wingdi::DeleteDC(hdc_mem);
-	
+	common::log_error();
 	        winuser::EndPaint(hwnd, &ps);
+	common::log_error();
 	    }
         _ => {}
     }
