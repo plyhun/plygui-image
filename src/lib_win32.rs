@@ -15,7 +15,7 @@ use winapi::ctypes::c_void;
 use std::{ptr, mem};
 use std::os::windows::ffi::OsStrExt;
 use std::ffi::OsStr;
-use std::cmp::max;
+use std::cmp::{min, max};
 
 lazy_static! {
 	pub static ref WINDOW_CLASS: Vec<u16> = OsStr::new("STATIC")
@@ -93,7 +93,7 @@ impl image_dev::ImageInner for ImageWin32 {
 			base: common::WindowsControlBase::new(),
 			
 			bmp: ptr::null_mut(),
-			scale: super::ScalePolicy::Fit(layout::Gravity::Center),			
+			scale: super::ScalePolicy::FitCenter,	
 		}, ()), MemberFunctions::new(_as_any, _as_any_mut, _as_member, _as_member_mut)));
 		
 		i.as_inner_mut().as_inner_mut().install_image(content);
@@ -124,7 +124,7 @@ impl ControlInner for ImageWin32 {
                 y as i32 + tm,
                 w as i32 - rm - lm,
                 h as i32 - bm - tm,
-                parent.native_id() as windef::HWND,
+                self.base.hwnd,
                 0,
                 WINDOW_CLASS.as_ptr(),
                 "",
@@ -158,6 +158,7 @@ impl ControlInner for ImageWin32 {
     #[cfg(feature = "markup")]
     fn fill_from_markup(&mut self, base: &mut development::MemberControlBase, markup: &plygui_api::markup::Markup, registry: &mut plygui_api::markup::MarkupRegistry) {
     	fill_from_markup_base!(self, base, markup, registry, Image, ["Image"]);
+    	//TODO image source
 	}
 }
 
@@ -205,8 +206,7 @@ impl Drawable for ImageWin32 {
 		if coords.is_some() {
             self.base.coords = coords;
         }
-        //let (lp,tp,rp,bp) = base.control.layout.padding.into();
-        let (lm, tm, rm, bm) = base.control.layout.margin.into();
+        let (lm,tm,rm,bm) = base.control.layout.margin.into();
         if let Some((x, y)) = self.base.coords {
             unsafe {
                 winuser::SetWindowPos(
@@ -214,8 +214,8 @@ impl Drawable for ImageWin32 {
                     ptr::null_mut(),
                     x + lm,
                     y + tm,
-                    self.base.measured_size.0 as i32 - rm,
-                    self.base.measured_size.1 as i32 - bm,
+                    self.base.measured_size.0 as i32 - rm - lm,
+                    self.base.measured_size.1 as i32 - bm - tm,
                     0,
                 );
             }
@@ -286,52 +286,87 @@ unsafe extern "system" fn handler(hwnd: windef::HWND, msg: minwindef::UINT, wpar
             }
         },
         winuser::WM_PAINT => {
-        	let sc = sc.as_inner_mut().as_inner_mut();
-        	let size = sc.size();
+        	use plygui_api::controls::HasLayout;
         	
-	        let mut bm: wingdi::BITMAP = mem::zeroed();
+        	let (lp, tp, rp, bp) = sc.layout_padding().into();
+	        let (lm, tm, rm, bm) = sc.layout_margin().into();
+	        let sc = sc.as_inner_mut().as_inner_mut();
+        	let (pw, ph) = sc.size();
+        	let mut hoffs = lp + lm;
+	        let mut voffs = tp + tm;
+	        let mut hdiff = hoffs + rp + rm;
+	        let mut vdiff = voffs + bp + bm;
+	        let inner_h = pw as i32 - hdiff;
+			let inner_v = ph as i32 - vdiff;
+
+        	let mut bm: wingdi::BITMAP = mem::zeroed();
 	        let mut ps: winuser::PAINTSTRUCT = mem::zeroed();
 	
-	        let mut hdc = winuser::BeginPaint(hwnd, &mut ps); //HDC
-	common::log_error();
-	        let mut hdc_mem = wingdi::CreateCompatibleDC(hdc); //HDC
-	common::log_error();
-	        let hbm_old = wingdi::SelectObject(hdc_mem, sc.bmp as *mut c_void); //HBITMAP
-	common::log_error();
+	        let mut hdc = winuser::BeginPaint(hwnd, &mut ps); 
+	        let mut hdc_mem = wingdi::CreateCompatibleDC(hdc); 
+	        wingdi::SelectObject(hdc_mem, sc.bmp as *mut c_void); //let hbm_old = 
 	        wingdi::GetObjectW(sc.bmp as *mut c_void, mem::size_of::<wingdi::BITMAP>() as i32, &mut bm as *mut _ as *mut c_void);
-	common::log_error();
-	        //wingdi::BitBlt(hdc, 0, 0, bm.bmWidth, bm.bmHeight, hdc_mem, 0, 0, wingdi::SRCCOPY);
-	
-	        //wingdi::SelectObject(hdc_mem, hbm_old);
 	        
-	        let blendfunc = wingdi::BLENDFUNCTION {
+	        let (wrate, hrate) = (inner_h as f32 / bm.bmWidth as f32, inner_v as f32 / bm.bmHeight as f32);
+	        let less_rate = fmin(wrate, hrate);
+        	
+        	let blendfunc = wingdi::BLENDFUNCTION {
 		        BlendOp: 0,
 		        BlendFlags: 0,
 		        SourceConstantAlpha: 255,
 		        AlphaFormat: 1,
 		    };
-		
+        	
+        	let (dst_x, dst_y, dst_w, dst_h, src_x, src_y, src_w, src_h) = match sc.scale {
+        		super::ScalePolicy::FitCenter => {
+	        		let bm_h = (bm.bmWidth as f32 * less_rate) as i32;
+		        	let bm_v = (bm.bmHeight as f32 * less_rate) as i32;
+	        		let xoffs = (pw as i32 - bm_h) / 2;
+	        		let yoffs = (ph as i32 - bm_v) / 2;
+	        		(xoffs, yoffs, bm_h, bm_v, 0, 0, bm.bmWidth, bm.bmHeight)
+        		},
+        		super::ScalePolicy::CropCenter => {
+        			let half_diff_h = (bm.bmWidth - pw as i32) / 2;
+        			let half_diff_v = (bm.bmHeight - ph as i32) / 2;
+	        		(
+	        			hoffs + min(hoffs, half_diff_h).abs(),
+	        			voffs + min(voffs, half_diff_v).abs(),
+		        		min(pw as i32, bm.bmWidth),
+		        		min(ph as i32, bm.bmHeight),
+		        		max(0, half_diff_h),
+		        		max(0, half_diff_v),
+		        		min(bm.bmWidth, inner_h),
+		        		min(bm.bmHeight, inner_v),
+	        		)
+        		}
+        	};	        
+		println!("{}/{}/{}/{} s {}/{}/{}/{}", dst_x, dst_y, dst_w, dst_h, src_x, src_y, src_w, src_h);
 		    wingdi::GdiAlphaBlend(hdc,
-		                         0,
-		                         0,
-		                         size.0 as i32,
-		                         size.1 as i32,
+		                         dst_x,
+		                         dst_y,
+		                         dst_w,
+		                         dst_h,
 		                         hdc_mem,
-		                         0,
-		                         0,
-		                         500,
-		                         500,
+		                         src_x,
+		                         src_y,
+		                         src_w,
+		                         src_h,
 								blendfunc);
-	common::log_error();       
+		    
 	        wingdi::DeleteDC(hdc_mem);
-	common::log_error();
 	        winuser::EndPaint(hwnd, &ps);
-	common::log_error();
 	    }
         _ => {}
     }
 
     commctrl::DefSubclassProc(hwnd, msg, wparam, lparam)
+}
+
+fn fmin(a: f32, b: f32) -> f32 {
+	if a < b { a } else { b }
+}
+fn fmax(a: f32, b: f32) -> f32 { // leave for future non-centered fit
+	if a > b { a } else { b }
 }
 
 impl_all_defaults!(Image);

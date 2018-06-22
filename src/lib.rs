@@ -61,8 +61,9 @@ use lib_gtk as inner_imp;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalePolicy {
-	Crop(plygui_api::layout::Gravity),
-	Fit(plygui_api::layout::Gravity),
+	CropCenter,// TODO variants
+	FitCenter, // TODO variants
+	// TODO Tile
 }
 
 pub trait Image: plygui_api::controls::Control {
