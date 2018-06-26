@@ -10,6 +10,8 @@ extern crate plygui_win32;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 extern crate winapi;
 #[cfg(all(target_os = "windows", feature = "win32"))]
+extern crate image;
+#[cfg(all(target_os = "windows", feature = "win32"))]
 use lib_win32 as inner_imp;
 
 #[cfg(target_os="macos")]
@@ -57,12 +59,20 @@ extern crate pango;
 #[cfg(feature = "gtk3")]
 use lib_gtk as inner_imp;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScalePolicy {
+	CropCenter,// TODO variants
+	FitCenter, // TODO variants
+	// TODO Tile
+}
+
 pub trait Image: plygui_api::controls::Control {
-    fn set_margin_width(&mut self, index: usize, width: isize);
+    fn set_scale(&mut self, policy: ScalePolicy);
+    fn scale(&self) -> ScalePolicy;
 }
 
 pub trait NewImage {
-	fn with_content(content: &str) -> Box<Image>;
+	fn with_content(content: image::DynamicImage) -> Box<Image>;
 }
 
 pub mod imp {
@@ -73,18 +83,26 @@ pub mod development {
 	use plygui_api::development::*;
 	
 	pub trait ImageInner: ControlInner {
-		fn with_content(content: &str) -> Box<super::Image>;
-		fn set_margin_width(&mut self, index: usize, width: isize);
+		fn with_content(content: super::image::DynamicImage) -> Box<super::Image>;
+		fn set_scale(&mut self, base: &mut super::plygui_api::development::MemberControlBase, policy: super::ScalePolicy);
+	    fn scale(&self) -> super::ScalePolicy;
 	}
 	
 	impl <T: ImageInner + Sized + 'static> super::Image for Member<Control<T>> {
-		fn set_margin_width(&mut self, index: usize, width: isize) {
-			self.as_inner_mut().as_inner_mut().set_margin_width(index, width)
+		fn set_scale(&mut self, policy: super::ScalePolicy) {
+			let base = self.base_mut() as *mut _ as *mut super::plygui_api::development::MemberControlBase;
+			self.as_inner_mut().as_inner_mut().set_scale(
+				unsafe { &mut *base },
+				policy
+			)
 		}
+	    fn scale(&self) -> super::ScalePolicy {
+	    	self.as_inner().as_inner().scale()
+	    }
 	}
 	impl <T: ImageInner + Sized> super::NewImage for Member<Control<T>> {
-		fn with_content(content: &str) -> Box<super::Image> {
+		fn with_content(content: super::image::DynamicImage) -> Box<super::Image> {
 			T::with_content(content)
 		}
-}
+	}
 }
