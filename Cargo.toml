@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 plygui-api = {version = "0.0.1", path = "../plygui-api"}
 lazy_static = "~0.2"
+image = "~0.19"
 
 plygui-gtk = {version = "0.0.1", path = "../plygui-gtk", optional = true}
 gtk = { version = "^0.4", features = ["v3_18"], optional = true }
@@ -30,7 +31,6 @@ qt_core_custom_events = {version = "*", path = "../qt_core_custom_events", optio
 [target.'cfg(target_os = "windows")'.dependencies]
 plygui-win32 = {version = "0.0.1", path = "../plygui-win32", optional = true}
 winapi = { version = "~0.3", features = ["windef", "minwindef", "winuser", "winbase", "commctrl", "errhandlingapi", "libloaderapi", "wingdi", "combaseapi", "imm", "oleauto"], optional = true }
-image = {version = "~0.19", optional = true}
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plygui-cocoa = { version = "0.0.1", path = "../plygui-cocoa", optional = true}
