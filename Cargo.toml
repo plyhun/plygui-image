@@ -21,6 +21,7 @@ gobject-sys = { version = "^0.6", optional = true }
 gtk-sys = { version = "^0.6", optional = true }
 libc = { version = "^0.2", optional = true }
 pango = { version = "^0.4", optional = true }
+cairo-rs = { version = "^0.4", optional = true }
 
 plygui-qt = {version = "0.0.1", path = "../plygui-qt", optional = true}
 qt_core = {version = "~0.2", optional = true}
@@ -40,7 +41,7 @@ objc = {version = "~0.2", optional = true}
 
 [features]
 win32 = ["winapi","plygui-win32","image"]
-gtk3 = ["plygui-gtk","gtk","gdk","glib","pango","cairo","plygui-gtk"]
+gtk3 = ["plygui-gtk","gtk","gdk","glib","pango","cairo-rs","plygui-gtk"]
 qt5 = ["plygui-qt","qt_core","qt_gui","qt_widgets","qt_core_custom_events","plygui-qt"]
 cocoa_ = ["cocoa","core-foundation","objc","plygui-cocoa"]
 native = ["win32", "cocoa_", "gtk3"]
