@@ -15,7 +15,7 @@ image = "~0.19"
 plygui-gtk = {version = "0.0.1", path = "../plygui-gtk", optional = true}
 gtk = { version = "^0.4", features = ["v3_18"], optional = true }
 gdk = { version = "^0.8", features = ["v3_18"], optional = true }
-gdk-pixbuf = { version = "^0.4", features = ["v3_18"], optional = true }
+gdk-pixbuf = { version = "^0.4", optional = true }
 glib = { version = "^0.5", optional = true }
 glib-sys = { version = "^0.6", optional = true }
 gobject-sys = { version = "^0.6", optional = true }
