@@ -3,14 +3,14 @@ extern crate lazy_static;
 #[macro_use]
 extern crate plygui_api;
 
+extern crate image;
+
 #[cfg(all(target_os = "windows", feature = "win32"))]
 mod lib_win32;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 extern crate plygui_win32;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 extern crate winapi;
-#[cfg(all(target_os = "windows", feature = "win32"))]
-extern crate image;
 #[cfg(all(target_os = "windows", feature = "win32"))]
 use lib_win32 as inner_imp;
 
@@ -51,11 +51,13 @@ extern crate plygui_gtk;
 #[cfg(feature = "gtk3")]
 extern crate gtk;
 #[cfg(feature = "gtk3")]
-extern crate gdk;
+extern crate gdk_pixbuf;
 #[cfg(feature = "gtk3")]
 extern crate glib;
 #[cfg(feature = "gtk3")]
 extern crate pango;
+#[cfg(feature = "gtk3")]
+extern crate cairo;
 #[cfg(feature = "gtk3")]
 use lib_gtk as inner_imp;
 
