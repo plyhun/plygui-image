@@ -21,6 +21,7 @@ gobject-sys = { version = "^0.6", optional = true }
 gtk-sys = { version = "^0.6", optional = true }
 libc = { version = "^0.2", optional = true }
 pango = { version = "^0.4", optional = true }
+cairo-rs = { version = "^0.4", optional = true }
 
 plygui-qt = {version = "0.0.1", path = "../plygui-qt", optional = true}
 qt_core = {version = "~0.2", optional = true}
