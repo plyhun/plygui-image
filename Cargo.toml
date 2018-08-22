@@ -41,7 +41,7 @@ core-foundation = {version = "~0.3", optional = true}
 objc = {version = "~0.2", optional = true}
 
 [features]
-win32 = ["winapi","plygui-win32","image"]
+win32 = ["winapi","plygui-win32"]
 gtk3 = ["plygui-gtk","gtk","gdk","gdk-pixbuf","glib","pango","cairo-rs","plygui-gtk"]
 qt5 = ["plygui-qt","qt_core","qt_gui","qt_widgets","qt_core_custom_events","plygui-qt"]
 cocoa_ = ["cocoa","core-foundation","objc","plygui-cocoa"]
