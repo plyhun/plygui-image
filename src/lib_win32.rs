@@ -232,10 +232,7 @@ unsafe extern "system" fn handler(hwnd: windef::HWND, msg: minwindef::UINT, wpar
             let width = lparam as u16;
             let height = (lparam >> 16) as u16;
 
-            if let Some(ref mut cb) = sc.base_mut().handler_resize {
-                let mut sc2: &mut Image = mem::transmute(param);
-                (cb.as_mut())(sc2, width, height);
-            }
+            sc.call_on_resize(width, height);
         }
         winuser::WM_PAINT => {
             let sc = sc.as_inner_mut().as_inner_mut();
