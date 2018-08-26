@@ -2,7 +2,8 @@ use super::development as image_dev;
 
 use plygui_qt::common::*;
 
-use qt_core::qt::AspectRatioMode;
+use qt_core::qt::{AlignmentFlag, AspectRatioMode};
+use qt_core::rect::{Rect as QRect};
 use qt_gui::image::{Format, Image as QImage};
 use qt_gui::pixmap::Pixmap as QPixmap;
 use qt_widgets::label::Label as QLabel;
@@ -38,6 +39,7 @@ impl image_dev::ImageInner for QtImage {
             qo.set_property(PROPERTY.as_ptr() as *const i8, &QVariant::new0(ptr));
         }
         i.as_inner_mut().as_inner_mut().update_image();
+        i.as_inner_mut().as_inner_mut().base.widget.set_alignment(Flags::from_enum(AlignmentFlag::Center));
         i
     }
     fn set_scale(&mut self, _: &mut MemberBase, _: &mut ControlBase, policy: super::ScalePolicy) {
@@ -55,15 +57,19 @@ impl QtImage {
     fn update_image(&mut self) {
         use image::GenericImage;
 
-        let (w, h) = self.content.dimensions();
         let (iw, ih) = self.size();
-        let ratio_mode = match self.scale {
-            super::ScalePolicy::FitCenter => AspectRatioMode::KeepAspectRatioByExpanding,
-            super::ScalePolicy::CropCenter => AspectRatioMode::KeepAspectRatio,
-        };
+        let (w, h) = self.content.dimensions();
         let raw = self.content.to_rgba().as_ptr();
         let img = unsafe { QImage::new_unsafe((raw, w as i32, h as i32, Format::FormatRGBA8888)) };
-        self.base.widget.set_pixmap(QPixmap::from_image(img.as_ref()).scaled((iw as i32, ih as i32, ratio_mode)).as_ref());
+        let modified = match self.scale {
+            super::ScalePolicy::FitCenter => {
+                QPixmap::from_image(img.as_ref()).scaled((iw as i32, ih as i32, AspectRatioMode::KeepAspectRatio))
+            },
+            super::ScalePolicy::CropCenter => {
+                QPixmap::from_image(img.as_ref()).copy(&QRect::new(((w as i32 - iw as i32)/2, (h as i32 - ih as i32)/2, iw as i32, ih as i32)))
+            }
+        };
+        self.base.widget.set_pixmap(modified.as_ref());
     }
 }
 
