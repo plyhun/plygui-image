@@ -1,22 +1,16 @@
 use super::development as image_dev;
-
-use plygui_api::{layout, types, utils, controls};
-use plygui_api::development::*;	
-
-use plygui_gtk::common;
+use plygui_gtk::common::*;
 
 use gtk::{Cast, Widget, WidgetExt, Image as GtkImageSys, ImageExt, Bin, BinExt, Label, LabelExt};
 use gdk_pixbuf::{Pixbuf, PixbufExt, Colorspace, InterpType};
 use pango::LayoutExt;
 use cairo::Format;
 
-use std::cmp::{min, max};
-
 pub type Image = Member<Control<GtkImage>>;
 
 #[repr(C)]
 pub struct GtkImage {
-    base: common::GtkControlBase<Image>,
+    base: GtkControlBase<Image>,
     
     scale: super::ScalePolicy,
     orig: Pixbuf,
@@ -33,7 +27,7 @@ impl image_dev::ImageInner for GtkImage {
 		let pixbuf = Pixbuf::new_from_vec(raw, Colorspace::Rgb, true, 8, w as i32, h as i32, stride);        
         
         let mut i = Box::new(Member::with_inner(Control::with_inner(GtkImage {
-                base: common::GtkControlBase::with_gtk_widget(GtkImageSys::new_from_pixbuf(Some(&pixbuf)).upcast::<Widget>()),
+                base: GtkControlBase::with_gtk_widget(GtkImageSys::new_from_pixbuf(Some(&pixbuf)).upcast::<Widget>()),
                 scale: super::ScalePolicy::FitCenter,  
                 orig: pixbuf,
             }, ()), MemberFunctions::new(_as_any, _as_any_mut, _as_member, _as_member_mut)));
@@ -46,7 +40,7 @@ impl image_dev::ImageInner for GtkImage {
         }
         i
     }
-	fn set_scale(&mut self, _: &mut MemberControlBase, policy: super::ScalePolicy) {
+	fn set_scale(&mut self, _: &mut MemberBase, _: &mut ControlBase, policy: super::ScalePolicy) {
 		if self.scale != policy {
 			self.scale = policy;
 			self.base.invalidate();
@@ -58,17 +52,16 @@ impl image_dev::ImageInner for GtkImage {
 }
 
 impl GtkImage {
-    fn apply_sized_image(&mut self, base: &MemberControlBase) {
+    fn apply_sized_image(&mut self) {
         let bm_width = self.orig.get_width();
     	let bm_height = self.orig.get_height();
     	
-    	let (lp, tp, rp, bp) = base.control.layout.padding.into();
-        let (lm, tm, rm, bm) = base.control.layout.margin.into();
-        let (aw, ah) = self.base.measured_size;
-        let hoffs = lp + lm;
-        let voffs = tp + tm;
-        let hdiff = hoffs + rp + rm;
-        let vdiff = voffs + bp + bm;
+    	let (aw, ah) = self.base.measured_size;
+    	let (lm, tm, rm, bm) = self.base.margins().into();
+        let hoffs = lm;
+        let voffs = tm;
+        let hdiff = hoffs + rm;
+        let vdiff = voffs + bm;
         let inner_h = aw as i32 - hdiff;
     	let inner_v = ah as i32 - vdiff;
     
@@ -91,7 +84,7 @@ impl GtkImage {
     		super::ScalePolicy::CropCenter => {
     			let half_diff_h = (bm_width - aw as i32) / 2;
     			let half_diff_v = (bm_height - ah as i32) / 2;
-        		self.orig.new_subpixbuf(max(0, half_diff_h), max(0, half_diff_v), min(bm_width, inner_h), min(bm_height, inner_v)).unwrap()
+        		self.orig.new_subpixbuf(cmp::max(0, half_diff_h), cmp::max(0, half_diff_v), cmp::min(bm_width, inner_h), cmp::min(bm_height, inner_v)).unwrap()
     		}
     	};
     	let image: Widget = self.base.widget.clone().into();
@@ -107,14 +100,12 @@ impl HasLayoutInner for GtkImage {
 }
 
 impl ControlInner for GtkImage {
-	fn on_added_to_container(&mut self, base: &mut MemberControlBase, parent: &controls::Container, x: i32, y: i32) {
-		let (pw, ph) = parent.draw_area_size();
-        self.measure(base, pw, ph);
-        println!("{} {} {:?}", ph, ph, self.base.measured_size);
+	fn on_added_to_container(&mut self, member: &mut MemberBase, control: &mut ControlBase, _parent: &controls::Container, x: i32, y: i32, pw: u16, ph: u16) {
+		self.measure(member, control, pw, ph);
         //self.apply_sized_image(base);
-        self.draw(base, Some((x, y)));
+        self.draw(member, control, Some((x, y)));
 	}
-    fn on_removed_from_container(&mut self, _: &mut MemberControlBase, _: &controls::Container) {}
+    fn on_removed_from_container(&mut self, _: &mut MemberBase, _: &mut ControlBase, _: &controls::Container) {}
     
     fn parent(&self) -> Option<&controls::Member> {
     	self.base.parent().map(|m| m.as_member())
@@ -130,7 +121,7 @@ impl ControlInner for GtkImage {
     }
     
     #[cfg(feature = "markup")]
-    fn fill_from_markup(&mut self, base: &mut MemberControlBase, mberarkup: &super::markup::Markup, registry: &mut super::markup::MarkupRegistry) {
+    fn fill_from_markup(&mut self, member: &mut MemberBase, control: &mut ControlBase, mberarkup: &super::markup::Markup, registry: &mut super::markup::MarkupRegistry) {
     	use plygui_api::markup::MEMBER_TYPE_BUTTON;
 		fill_from_markup_base!(
             self,
@@ -146,7 +137,7 @@ impl ControlInner for GtkImage {
 }
 
 impl MemberInner for GtkImage {
-	type Id = common::GtkWidget;
+	type Id = GtkWidget;
 	
     fn size(&self) -> (u16, u16) {
     	self.base.measured_size
@@ -162,19 +153,18 @@ impl MemberInner for GtkImage {
 }
 
 impl Drawable for GtkImage {
-	fn draw(&mut self, base: &mut MemberControlBase, coords: Option<(i32, i32)>) {
-		self.base.draw(base, coords);
+	fn draw(&mut self, member: &mut MemberBase, control: &mut ControlBase, coords: Option<(i32, i32)>) {
+		self.base.draw(member, control, coords);
 	}
-    fn measure(&mut self, base: &mut MemberControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
+    fn measure(&mut self, member: &mut MemberBase, control: &mut ControlBase, parent_width: u16, parent_height: u16) -> (u16, u16, bool) {
     	let old_size = self.base.measured_size;
-    	self.base.measured_size = match base.member.visibility {
+    	self.base.measured_size = match member.visibility {
             types::Visibility::Gone => (0, 0),
             _ => {
-                let (lp,tp,rp,bp) = base.control.layout.padding.into();
-		    	let (lm,tm,rm,bm) = base.control.layout.margin.into();
+                let (lm,tm,rm,bm) = self.base.margins().into();
 		    	    	
 		    	let mut label_size = (-1i32, -1i32);
-                let w = match base.control.layout.width {
+                let w = match control.layout.width {
                     layout::Size::MatchParent => parent_width as i32,
                     layout::Size::Exact(w) => w as i32,
                     layout::Size::WrapContent => {
@@ -184,14 +174,10 @@ impl Drawable for GtkImage {
                         	let mut label = bin.get_child().unwrap().downcast::<Label>().unwrap();		
                         	label_size = label.get_layout().unwrap().get_pixel_size();			
                         }
-                        // why the bloody hell I need these?
-                        label_size.0 += 4;
-                        label_size.1 += 4;
-                        
-                        label_size.0 + lp + rp + lm + rm
+                        label_size.0 + lm + rm
                     } 
                 };
-                let h = match base.control.layout.height {
+                let h = match control.layout.height {
                     layout::Size::MatchParent => parent_height as i32,
                     layout::Size::Exact(h) => h as i32,
                     layout::Size::WrapContent => {
@@ -201,14 +187,10 @@ impl Drawable for GtkImage {
                         	let mut label = bin.get_child().unwrap().downcast::<Label>().unwrap();		
                         	label_size = label.get_layout().unwrap().get_pixel_size();	
                         }
-                        // why the bloody hell I need these?
-                        label_size.0 += 4;
-                        label_size.1 += 4;
-                        
-                        label_size.1 + tp + bp + tm + bm
+                        label_size.1 + tm + bm
                     } 
                 };
-                (max(0, w) as u16, max(0, h) as u16)
+                (cmp::max(0, w) as u16, cmp::max(0, h) as u16)
             },
         };
     	(
@@ -217,7 +199,7 @@ impl Drawable for GtkImage {
             self.base.measured_size != old_size,
         )
     }
-    fn invalidate(&mut self, _: &mut MemberControlBase) {
+    fn invalidate(&mut self, _: &mut MemberBase, _: &mut ControlBase) {
     	self.base.invalidate()
     }
 }
@@ -229,22 +211,17 @@ pub(crate) fn spawn() -> Box<controls::Control> {
 
 fn on_show(this: &::gtk::Widget) {
     let mut ll1 = this.clone().upcast::<Widget>();
-    let mut ll2 = this.clone().upcast::<Widget>();
-	let ll1 = common::cast_gtk_widget_to_member_mut::<Image>(&mut ll1).unwrap();
-	let ll2 = common::cast_gtk_widget_to_member_mut::<Image>(&mut ll2).unwrap();
-	
-	println!("Shown");
-	
-	ll1.as_inner_mut().as_inner_mut().apply_sized_image(utils::member_control_base(ll2));
+    let ll1 = cast_gtk_widget_to_member_mut::<Image>(&mut ll1).unwrap();
+	ll1.as_inner_mut().as_inner_mut().apply_sized_image();
 }
 
 fn on_size_allocate(this: &::gtk::Widget, _allo: &::gtk::Rectangle) {
     let mut ll1 = this.clone().upcast::<Widget>();
     let mut ll2 = this.clone().upcast::<Widget>();
-	let ll1 = common::cast_gtk_widget_to_member_mut::<Image>(&mut ll1).unwrap();
-	let ll2 = common::cast_gtk_widget_to_member_mut::<Image>(&mut ll2).unwrap();
+	let ll1 = cast_gtk_widget_to_member_mut::<Image>(&mut ll1).unwrap();
+	let ll2 = cast_gtk_widget_to_member_mut::<Image>(&mut ll2).unwrap();
 	
-	ll1.as_inner_mut().as_inner_mut().apply_sized_image(utils::member_control_base(ll2));
+	ll1.as_inner_mut().as_inner_mut().apply_sized_image();
 	
 	let measured_size = ll1.as_inner().as_inner().base.measured_size;
 	if let Some(ref mut cb) = ll1.base_mut().handler_resize {
