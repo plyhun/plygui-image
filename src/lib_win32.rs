@@ -294,13 +294,13 @@ fn fmin(a: f32, b: f32) -> f32 {
         b
     }
 }
-fn fmax(a: f32, b: f32) -> f32 {
+/*fn fmax(a: f32, b: f32) -> f32 {
     // leave for future non-centered fit
     if a > b {
         a
     } else {
         b
     }
-}
+}*/
 
 impl_all_defaults!(Image);
