@@ -15,6 +15,7 @@ pub struct QtImage {
     base: QtControlBase<Image, QLabel>,
 
     scale: super::ScalePolicy,
+    pixmap: CppBox<QPixmap>,
     content: super::image::DynamicImage,
 }
 
@@ -25,6 +26,7 @@ impl image_dev::ImageInner for QtImage {
                 QtImage {
                     base: QtControlBase::with_params(QLabel::new(()), event_handler),
                     scale: super::ScalePolicy::FitCenter,
+                    pixmap: unsafe { CppBox::new(ptr::null_mut()) },
                     content: content,
                 },
                 (),
@@ -38,8 +40,8 @@ impl image_dev::ImageInner for QtImage {
             let qo: &mut QObject = i.as_inner_mut().as_inner_mut().base.widget.static_cast_mut();
             qo.set_property(PROPERTY.as_ptr() as *const i8, &QVariant::new0(ptr));
         }
-        i.as_inner_mut().as_inner_mut().update_image();
         i.as_inner_mut().as_inner_mut().base.widget.set_alignment(Flags::from_enum(AlignmentFlag::Center));
+        i.as_inner_mut().as_inner_mut().update_image();
         i
     }
     fn set_scale(&mut self, _: &mut MemberBase, _: &mut ControlBase, policy: super::ScalePolicy) {
@@ -59,9 +61,9 @@ impl QtImage {
 
         let (iw, ih) = self.size();
         let (w, h) = self.content.dimensions();
-        let raw = self.content.to_rgba().as_ptr();
-        let img = unsafe { QImage::new_unsafe((raw, w as i32, h as i32, Format::FormatRGBA8888)) };
-        let modified = match self.scale {
+        let raw = self.content.to_rgba().into_raw();
+        let img = unsafe { QImage::new_unsafe((raw.as_ptr(), w as i32, h as i32, Format::FormatRGBA8888)) };
+        self.pixmap = match self.scale {
             super::ScalePolicy::FitCenter => {
                 QPixmap::from_image(img.as_ref()).scaled((iw as i32, ih as i32, AspectRatioMode::KeepAspectRatio))
             },
@@ -69,7 +71,7 @@ impl QtImage {
                 QPixmap::from_image(img.as_ref()).copy(&QRect::new(((w as i32 - iw as i32)/2, (h as i32 - ih as i32)/2, iw as i32, ih as i32)))
             }
         };
-        self.base.widget.set_pixmap(modified.as_ref());
+        self.base.widget.set_pixmap(self.pixmap.as_ref());
     }
 }
 
@@ -133,19 +135,21 @@ impl Drawable for QtImage {
         self.base.measured_size = match member.visibility {
             types::Visibility::Gone => (0, 0),
             _ => {
-                use image::GenericImage;
-
                 let margins = self.base.widget.contents_margins();
-
+                let size = if self.pixmap.is_null() {
+                    QSize::new((0, 0))
+                } else {
+                    self.pixmap.size()
+                };
                 let w = match control.layout.width {
                     layout::Size::MatchParent => parent_width as i32,
                     layout::Size::Exact(w) => w as i32,
-                    layout::Size::WrapContent => self.content.width() as i32 + margins.left() + margins.right(),
+                    layout::Size::WrapContent => size.width() as i32 + margins.left() + margins.right(),
                 };
                 let h = match control.layout.height {
                     layout::Size::MatchParent => parent_height as i32,
                     layout::Size::Exact(h) => h as i32,
-                    layout::Size::WrapContent => self.content.height() as i32 + margins.top() + margins.bottom(),
+                    layout::Size::WrapContent => size.height() as i32 + margins.top() + margins.bottom(),
                 };
                 (cmp::max(0, w) as u16, cmp::max(0, h) as u16)
             }
@@ -162,34 +166,28 @@ pub(crate) fn spawn() -> Box<controls::Control> {
 	Image::with_content("").into_control()
 }*/
 
-fn fmin(a: f32, b: f32) -> f32 {
-    if a < b {
-        a
-    } else {
-        b
-    }
-}
 fn event_handler(object: &mut QObject, event: &QEvent) -> bool {
-    unsafe {
-        match event.type_() {
-            QEventType::Resize => {
-                let ptr = object.property(PROPERTY.as_ptr() as *const i8).to_u_long_long();
-                if ptr != 0 {
-                    let sc: &mut Image = mem::transmute(ptr);
-
-                    sc.as_inner_mut().as_inner_mut().update_image();
-
-                    if sc.as_inner().as_inner().base.dirty {
-                        sc.as_inner_mut().as_inner_mut().base.dirty = false;
-                        let (width, height) = sc.as_inner().as_inner().size();
-                        sc.call_on_resize(width, height);
-                    }
+    match event.type_() {
+        QEventType::Resize => {
+            let ptr = unsafe { object.property(PROPERTY.as_ptr() as *const i8).to_u_long_long() };
+            if ptr != 0 {
+                let sc: &mut Image = unsafe { mem::transmute(ptr) };
+                sc.as_inner_mut().as_inner_mut().update_image();
+                if sc.as_inner().as_inner().base.dirty {
+                    sc.as_inner_mut().as_inner_mut().base.dirty = false;
+                    let (width, height) = sc.as_inner().as_inner().size();
+                    sc.call_on_resize(width, height);
                 }
             }
-            _ => {}
-        }
-        false
+        },
+        QEventType::Destroy => {
+            if let Some(ll) = cast_qobject_to_uimember_mut::<Image>(object) {
+                unsafe { ptr::write(&mut ll.as_inner_mut().as_inner_mut().base.widget, CppBox::new(ptr::null_mut())); }
+            }
+        },
+        _ => {}
     }
+    false
 }
 
 impl_all_defaults!(Image);
